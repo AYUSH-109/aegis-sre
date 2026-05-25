@@ -4,7 +4,7 @@
 
 ---
 
-![Aegis-Antigravity SRE Banner](assets/aegis_sre_banner.png)
+![Aegis-Antigravity SRE Technical Architecture](assets/aegis_technical_architecture.png)
 
 Aegis-Antigravity SRE is a next-generation, high-performance incident response platform built entirely in **pure Python** using the Reflex framework (Next.js/React compiled frontend + FastAPI backend). 
 
@@ -68,7 +68,7 @@ aegis-antigravity-sre/
 ├── README.md                          # Comprehensive user and architectural manual
 ├── logs/                              # Directory holding local forensic logs (e.g. Parquet files)
 ├── assets/
-│   └── aegis_sre_banner.png           # Custom visual architecture graphic
+│   └── aegis_technical_architecture.png # Premium high-fidelity Unreal Engine style technical dataflow graphic
 ├── tools/
 │   ├── __init__.py                    # Utilities package exports
 │   ├── coral_executor.py              # Secure subprocess Coral CLI runner
