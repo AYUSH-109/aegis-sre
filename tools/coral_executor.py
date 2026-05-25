@@ -58,7 +58,7 @@ def execute_coral_query(query: str, timeout: float = 30.0) -> Dict[str, Any]:
     # Therefore, we automatically route it to our high-fidelity mock execution engine
     # to guarantee a correct SRE response.
     query_upper = query.upper()
-    is_local_or_osv = "READ(" in query_upper or "PARQUET" in query_upper or "OSV" in query_upper or "LOCAL_FILE" in query_upper or "GITHUB" in query_upper or "COMMITS" in query_upper
+    is_local_or_osv = "READ(" in query_upper or "PARQUET" in query_upper or "OSV" in query_upper or "LOCAL_FILE" in query_upper
 
     coral_binary = shutil.which("coral")
     if not coral_binary or is_local_or_osv:
@@ -211,6 +211,38 @@ def _mock_coral_execution(query: str) -> Dict[str, Any]:
 
     # Mock response for GitHub handle TANISHX1 commits
     elif "TANISHX1" in query_upper or "GITHUB" in query_upper:
+        try:
+            import subprocess
+            git_cmd = ["git", "log", "-n", "5", "--pretty=format:%H||%an||%ad||%s", "--date=iso"]
+            result = subprocess.run(git_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, check=True)
+            commits = []
+            for line in result.stdout.strip().split("\n"):
+                if not line:
+                    continue
+                parts = line.split("||")
+                if len(parts) == 4:
+                    h, author, date, msg = parts
+                    # Fetch modified files for this commit
+                    files_cmd = ["git", "show", "--name-only", "--pretty=format:", h]
+                    files_res = subprocess.run(files_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                    changed_files = ", ".join(filter(None, files_res.stdout.strip().split("\n")))
+                    commits.append({
+                        "commit_hash": h[:7],
+                        "author": author,
+                        "commit_date": date,
+                        "message": msg,
+                        "changed_files": changed_files or "None"
+                    })
+            if commits:
+                return {
+                    "status": "success",
+                    "data": commits,
+                    "count": len(commits)
+                }
+        except Exception as e:
+            logger.warning(f"Failed to query real git commits, falling back to mock: {e}")
+
+        # Fallback if git command fails or is not a git repo
         return {
             "status": "success",
             "data": [
