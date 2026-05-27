@@ -227,38 +227,67 @@ OPENAI_TOOLS = [
 class SREBrain:
     def __init__(self):
         # 1. CLIENT INITIALIZATION
-        # Priority: GEMINI_API_KEY > OPENAI_API_KEY. This ensures users who only
-        # set GEMINI_API_KEY in .env (the common case) get routed to the native
-        # Gemini SDK without needing to alias it as OPENAI_API_KEY.
-        self.api_key = os.getenv("GEMINI_API_KEY") or os.getenv("OPENAI_API_KEY")
-        self.model = os.getenv("SRE_LLM_MODEL", "gemini-2.0-flash")
+        # Priority: GROQ_API_KEY > GEMINI_API_KEY > OPENAI_API_KEY
+        # Groq provides free, fast OpenAI-compatible API with generous rate limits.
+        # Gemini uses the native google-genai SDK with function calling.
+        # OpenAI is the standard fallback with configurable base URL.
         
-        # Detect if we should use Google GenAI native client or OpenAI client
+        self.provider = "mock"  # Will be set to "groq", "gemini", or "openai"
         self.is_gemini_native = False
-        if self.api_key and self.api_key.startswith("AIzaSy"):
-            self.is_gemini_native = True
         
-        # Guard against placeholder values left in .env templates
-        _placeholders = ("your_openai_api_key", "your_gemini_key", "your-key-here")
-        if not self.api_key or any(p in self.api_key.lower() for p in _placeholders):
-            logger.warning("No valid LLM API key found (checked GEMINI_API_KEY and OPENAI_API_KEY). Operating SRE Brain in simulated mock mode.")
-            self.client = None
-        else:
-            if self.is_gemini_native:
-                if not HAS_GEMINI:
-                    logger.warning("google-genai library is not installed. Operating SRE Brain in simulated mock mode.")
-                    self.client = None
-                else:
-                    logger.info("Initializing Google GenAI native client for Gemini model.")
-                    self.client = genai.Client(api_key=self.api_key)
+        groq_key = os.getenv("GROQ_API_KEY")
+        gemini_key = os.getenv("GEMINI_API_KEY")
+        openai_key = os.getenv("OPENAI_API_KEY")
+        
+        # Guard against placeholder values
+        _placeholders = ("your_openai_api_key", "your_gemini_key", "your-key-here", 
+                         "your_groq_key", "gsk_placeholder")
+        
+        def _is_valid(key):
+            return key and key.strip() and not any(p in key.lower() for p in _placeholders)
+        
+        self.client = None
+        
+        # Priority 1: Groq (free, fast, no rate limit issues)
+        if _is_valid(groq_key):
+            if HAS_OPENAI:
+                logger.info("🚀 Initializing Groq client (Llama 3.3 70B via OpenAI-compatible API).")
+                self.api_key = groq_key
+                self.model = os.getenv("SRE_LLM_MODEL", "llama-3.3-70b-versatile")
+                self.client = OpenAI(
+                    api_key=groq_key,
+                    base_url="https://api.groq.com/openai/v1"
+                )
+                self.provider = "groq"
             else:
-                if not HAS_OPENAI:
-                    logger.warning("openai library is not installed. Operating SRE Brain in simulated mock mode.")
-                    self.client = None
-                else:
-                    logger.info("Initializing OpenAI standard client.")
-                    base_url = os.getenv("OPENAI_API_BASE", None)
-                    self.client = OpenAI(api_key=self.api_key, base_url=base_url)
+                logger.warning("Groq key found but openai library not installed.")
+        
+        # Priority 2: Gemini (native SDK with function calling)
+        if not self.client and _is_valid(gemini_key):
+            if HAS_GEMINI:
+                logger.info("Initializing Google GenAI native client for Gemini model.")
+                self.api_key = gemini_key
+                self.model = os.getenv("SRE_LLM_MODEL", "gemini-2.0-flash")
+                self.client = genai.Client(api_key=gemini_key)
+                self.is_gemini_native = True
+                self.provider = "gemini"
+            else:
+                logger.warning("Gemini key found but google-genai library not installed.")
+        
+        # Priority 3: OpenAI (standard or custom endpoint)
+        if not self.client and _is_valid(openai_key):
+            if HAS_OPENAI:
+                base_url = os.getenv("OPENAI_API_BASE", None)
+                logger.info(f"Initializing OpenAI client{' (custom endpoint)' if base_url else ''}.")
+                self.api_key = openai_key
+                self.model = os.getenv("SRE_LLM_MODEL", "gpt-4o")
+                self.client = OpenAI(api_key=openai_key, base_url=base_url)
+                self.provider = "openai"
+            else:
+                logger.warning("OpenAI key found but openai library not installed.")
+        
+        if not self.client:
+            logger.warning("No valid LLM API key found (checked GROQ_API_KEY, GEMINI_API_KEY, OPENAI_API_KEY). Operating in mock mode.")
 
         # 2. DYNAMIC SYSTEM PROMPT CONFIGURATION
         # Inject the target GitHub repository from environment into the system prompt
