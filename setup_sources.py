@@ -14,6 +14,12 @@ import os
 import subprocess
 import shutil
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"), override=True)
+except ImportError:
+    pass
+
 PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 LOGS_DIR = os.path.join(PROJECT_ROOT, "logs")
 

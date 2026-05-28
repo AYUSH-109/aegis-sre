@@ -123,70 +123,93 @@ class State(rx.State):
         "vulnerable": "urllib3 (CVE-2023-43804)",
         "remediation": "Upgrade to urllib3>=1.26.18, rollback TANISHX1's commit a5d89f3."
     }
+    
+    # 6. Integrations State
+    github_token: str = os.environ.get("GITHUB_TOKEN", "")
+    github_owner: str = os.environ.get("GITHUB_REPO", "Harshit7623/aegis-sre").split("/")[0] if "/" in os.environ.get("GITHUB_REPO", "Harshit7623/aegis-sre") else "Harshit7623"
+    github_repo_name: str = os.environ.get("GITHUB_REPO", "Harshit7623/aegis-sre").split("/")[1] if "/" in os.environ.get("GITHUB_REPO", "Harshit7623/aegis-sre") else "aegis-sre"
+    github_connection_status: str = "Checking..."
+    osv_connection_status: str = "Checking..."
+    show_github_token_input: bool = False
+    
+    notion_connection_status: str = "Checking..."
+    show_notion_token_input: bool = False
+    notion_token: str = ""
+
+    jira_connection_status: str = "Checking..."
+    show_jira_token_input: bool = False
+    jira_token: str = ""
+
+    slack_connection_status: str = "Checking..."
+    show_slack_token_input: bool = False
+    slack_token: str = ""
 
     # 6. ASYNC CORE INVESTIGATION LOOP
-    @rx.background
+    @rx.event(background=True)
     async def trigger_investigation(self):
         """
         Launches SRE Brain async reasoning.
         Iterates over the agent's thoughts and tool actions, yielding them continuously to 
         prevent Next.js socket timeouts and keep the UI reactive.
         """
-        if not self.current_question.strip():
-            return
+        async with self:
+            if not self.current_question.strip():
+                return
             
-        self.is_investigating = True
-        # Clear logs to focus on current trace session
-        self.agent_thought_log = [f"System: Starting investigation sequence for: '{self.current_question}'"]
-        yield # Force UI refresh to render loading states
+            self.is_investigating = True
+            # Clear logs to focus on current trace session
+            self.agent_thought_log = [f"System: Starting investigation sequence for: '{self.current_question}'"]
+            # Capture question and history before releasing the lock
+            current_q = self.current_question
+            history_buffer = []
+            for turn in self.chat_history[-6:]:
+                history_buffer.append({"role": turn["role"], "content": turn["content"]})
+        yield  # Force UI refresh to render loading states
 
         # Instantiating SREBrain. Done inside the method so it refreshes environmental variables (e.g. keys) dynamically.
         brain = SREBrain()
-        
-        # Compile chat history to match raw OpenAI message structures.
-        history_buffer = []
-        # Take last 6 turns to keep context window tight, reducing token consumption.
-        for turn in self.chat_history[-6:]:
-            history_buffer.append({"role": turn["role"], "content": turn["content"]})
             
         # Run SRE agent generator loop
         try:
             # We fetch thoughts via generator to print intermediate diagnostics to the operator.
-            for step in brain.run_investigation_loop(self.current_question, history_buffer):
+            for step in brain.run_investigation_loop(current_q, history_buffer):
                 step_type = step.get("type")
                 
-                if step_type == "status":
-                    self.agent_thought_log.append(f"🔄 {step.get('content')}")
-                elif step_type == "thought":
-                    self.agent_thought_log.append(f"🧠 {step.get('content')}")
-                elif step_type == "tool_call":
-                    tool_name = step.get("tool_name")
-                    args = step.get("arguments", {})
-                    self.agent_thought_log.append(f"🛠️ Tool Call: {tool_name} with params -> {args}")
-                elif step_type == "tool_result":
-                    tool_name = step.get("tool_name")
-                    result = step.get("result", {})
-                    self.agent_thought_log.append(f"✅ Tool {tool_name} returned status: {result.get('status')}")
-                    
-                    # Dynamically update the blast radius or SVG topology based on Coral execution outputs!
-                    if tool_name == "execute_coral_query" and result.get("status") == "success":
-                        self._parse_query_impact(result.get("data", []))
-                elif step_type == "final":
-                    self.chat_history.append({"role": "user", "content": self.current_question})
-                    self.chat_history.append({"role": "assistant", "content": step.get("content", "")})
-                    self.current_question = ""
-                elif step_type == "error":
-                    self.agent_thought_log.append(f"❌ Error: {step.get('content')}")
-                    self.chat_history.append({"role": "assistant", "content": f"⚠️ SRE Brain encountered an execution block: {step.get('content')}"})
+                async with self:
+                    if step_type == "status":
+                        self.agent_thought_log.append(f"🔄 {step.get('content')}")
+                    elif step_type == "thought":
+                        self.agent_thought_log.append(f"🧠 {step.get('content')}")
+                    elif step_type == "tool_call":
+                        tool_name = step.get("tool_name")
+                        args = step.get("arguments", {})
+                        self.agent_thought_log.append(f"🛠️ Tool Call: {tool_name} with params -> {args}")
+                    elif step_type == "tool_result":
+                        tool_name = step.get("tool_name")
+                        result = step.get("result", {})
+                        self.agent_thought_log.append(f"✅ Tool {tool_name} returned status: {result.get('status')}")
+                        
+                        # Dynamically update the blast radius or SVG topology based on Coral execution outputs!
+                        if tool_name == "execute_coral_query" and result.get("status") == "success":
+                            self._parse_query_impact(result.get("data", []))
+                    elif step_type == "final":
+                        self.chat_history.append({"role": "user", "content": current_q})
+                        self.chat_history.append({"role": "assistant", "content": step.get("content", "")})
+                        self.current_question = ""
+                    elif step_type == "error":
+                        self.agent_thought_log.append(f"❌ Error: {step.get('content')}")
+                        self.chat_history.append({"role": "assistant", "content": f"⚠️ SRE Brain encountered an execution block: {step.get('content')}"})
                 
                 # Push state delta updates to the Reflex websocket immediately
                 yield
                 
         except Exception as e:
-            self.agent_thought_log.append(f"❌ Fatal crash in SRE brain loop: {str(e)}")
+            async with self:
+                self.agent_thought_log.append(f"❌ Fatal crash in SRE brain loop: {str(e)}")
             yield
             
-        self.is_investigating = False
+        async with self:
+            self.is_investigating = False
         yield
 
     def select_node(self, node_id: str):
@@ -261,15 +284,224 @@ class State(rx.State):
         """
         self.current_question = question
 
-    async def handle_key_down(self, key: str):
+    def set_github_token(self, val: str):
+        self.github_token = val
+        
+    def set_github_owner(self, val: str):
+        self.github_owner = val
+        
+    def set_github_repo_name(self, val: str):
+        self.github_repo_name = val
+
+    def toggle_github_token_input(self):
+        self.show_github_token_input = True
+
+    def set_notion_token(self, val: str):
+        self.notion_token = val
+    def toggle_notion_token_input(self):
+        self.show_notion_token_input = True
+
+    def set_jira_token(self, val: str):
+        self.jira_token = val
+    def toggle_jira_token_input(self):
+        self.show_jira_token_input = True
+
+    def set_slack_token(self, val: str):
+        self.slack_token = val
+    def toggle_slack_token_input(self):
+        self.show_slack_token_input = True
+
+    @rx.event(background=True)
+    async def update_github_scope(self):
+        """
+        Updates the target repository scope in the environment and .env file independently of the API token connection.
+        """
+        import os, dotenv
+        async with self:
+            full_repo = f"{self.github_owner}/{self.github_repo_name}" if self.github_owner and self.github_repo_name else "Harshit7623/aegis-sre"
+            os.environ["GITHUB_REPO"] = full_repo
+            
+            env_file = os.path.join(os.getcwd(), ".env")
+            if not os.path.exists(env_file):
+                open(env_file, 'a').close()
+            dotenv.set_key(env_file, "GITHUB_REPO", full_repo)
+            
+            self.agent_thought_log.append(f"🔄 Updated target repository scope to: {full_repo}")
+
+    @rx.event(background=True)
+    async def connect_github(self):
+        """
+        Dynamically connects the GitHub API via Coral MCP based on user GUI input.
+        """
+        import subprocess, os
+        import dotenv
+        async with self:
+            if not self.github_token:
+                self.github_connection_status = "Error: Missing token"
+                return
+            self.github_connection_status = "Connecting..."
+            token = self.github_token
+            # Build full repo name
+            full_repo = f"{self.github_owner}/{self.github_repo_name}" if self.github_owner and self.github_repo_name else "Harshit7623/aegis-sre"
+            os.environ["GITHUB_REPO"] = full_repo
+            os.environ["GITHUB_TOKEN"] = token
+            
+            # Permanently sync to .env file to survive restarts
+            env_file = os.path.join(os.getcwd(), ".env")
+            if not os.path.exists(env_file):
+                open(env_file, 'a').close()
+            dotenv.set_key(env_file, "GITHUB_TOKEN", token)
+            dotenv.set_key(env_file, "GITHUB_REPO", full_repo)
+            
+        env = os.environ.copy()
+        
+        # Remove and re-add GitHub source via Coral CLI
+        subprocess.run(["coral", "source", "remove", "github"], capture_output=True)
+        res = subprocess.run(["coral", "source", "add", "github"], env=env, capture_output=True, text=True)
+        
+        async with self:
+            if res.returncode == 0:
+                self.github_connection_status = "Connected (Live)"
+                self.show_github_token_input = False
+                self.agent_thought_log.append(f"🔗 Connected live GitHub API (Target Repo: {full_repo})")
+            else:
+                self.github_connection_status = "Connection Failed"
+                self.agent_thought_log.append(f"❌ Failed to connect GitHub: {res.stderr}")
+
+    @rx.event(background=True)
+    async def connect_notion(self):
+        import subprocess, os, dotenv
+        async with self:
+            if not self.notion_token:
+                self.notion_connection_status = "Error: Missing token"
+                return
+            self.notion_connection_status = "Connecting..."
+            token = self.notion_token
+            os.environ["NOTION_TOKEN"] = token
+            env_file = os.path.join(os.getcwd(), ".env")
+            if not os.path.exists(env_file): open(env_file, 'a').close()
+            dotenv.set_key(env_file, "NOTION_TOKEN", token)
+        env = os.environ.copy()
+        subprocess.run(["coral", "source", "remove", "notion"], capture_output=True)
+        res = subprocess.run(["coral", "source", "add", "notion"], env=env, capture_output=True, text=True)
+        async with self:
+            if res.returncode == 0:
+                self.notion_connection_status = "Connected (Live)"
+                self.show_notion_token_input = False
+                self.agent_thought_log.append("🔗 Connected live Notion API")
+            else:
+                self.notion_connection_status = "Connection Failed"
+                self.agent_thought_log.append(f"❌ Failed to connect Notion: {res.stderr}")
+
+    @rx.event(background=True)
+    async def connect_jira(self):
+        import subprocess, os, dotenv
+        async with self:
+            if not self.jira_token:
+                self.jira_connection_status = "Error: Missing token"
+                return
+            self.jira_connection_status = "Connecting..."
+            token = self.jira_token
+            os.environ["JIRA_API_TOKEN"] = token
+            env_file = os.path.join(os.getcwd(), ".env")
+            if not os.path.exists(env_file): open(env_file, 'a').close()
+            dotenv.set_key(env_file, "JIRA_API_TOKEN", token)
+        env = os.environ.copy()
+        subprocess.run(["coral", "source", "remove", "jira"], capture_output=True)
+        res = subprocess.run(["coral", "source", "add", "jira"], env=env, capture_output=True, text=True)
+        async with self:
+            if res.returncode == 0:
+                self.jira_connection_status = "Connected (Live)"
+                self.show_jira_token_input = False
+                self.agent_thought_log.append("🔗 Connected live Jira API")
+            else:
+                self.jira_connection_status = "Connection Failed"
+                self.agent_thought_log.append(f"❌ Failed to connect Jira: {res.stderr}")
+
+    @rx.event(background=True)
+    async def connect_slack(self):
+        import subprocess, os, dotenv
+        async with self:
+            if not self.slack_token:
+                self.slack_connection_status = "Error: Missing token"
+                return
+            self.slack_connection_status = "Connecting..."
+            token = self.slack_token
+            os.environ["SLACK_BOT_TOKEN"] = token
+            env_file = os.path.join(os.getcwd(), ".env")
+            if not os.path.exists(env_file): open(env_file, 'a').close()
+            dotenv.set_key(env_file, "SLACK_BOT_TOKEN", token)
+        env = os.environ.copy()
+        subprocess.run(["coral", "source", "remove", "slack"], capture_output=True)
+        res = subprocess.run(["coral", "source", "add", "slack"], env=env, capture_output=True, text=True)
+        async with self:
+            if res.returncode == 0:
+                self.slack_connection_status = "Connected (Live)"
+                self.show_slack_token_input = False
+                self.agent_thought_log.append("🔗 Connected live Slack API")
+            else:
+                self.slack_connection_status = "Connection Failed"
+                self.agent_thought_log.append(f"❌ Failed to connect Slack: {res.stderr}")
+
+    @rx.event(background=True)
+    async def check_coral_connections(self):
+        """
+        Dynamically queries Coral CLI to determine exactly which APIs are mounted.
+        This provides a true source of truth rather than blindly relying on environment files.
+        """
+        import subprocess
+        try:
+            res = subprocess.run(["coral", "source", "list"], capture_output=True, text=True)
+            output = res.stdout
+            
+            async with self:
+                if "\ngithub " in output or "^github " in output or "github " in output:
+                    self.github_connection_status = "Connected (Live)"
+                    self.show_github_token_input = False
+                else:
+                    self.github_connection_status = "Not Connected"
+                    self.show_github_token_input = True
+                    
+                if "\nosv " in output or "^osv " in output or "osv " in output:
+                    self.osv_connection_status = "Connected (Mock Parquet)"
+                else:
+                    self.osv_connection_status = "Not Connected"
+
+                if "\nnotion " in output or "^notion " in output or "notion " in output:
+                    self.notion_connection_status = "Connected (Live)"
+                    self.show_notion_token_input = False
+                else:
+                    self.notion_connection_status = "Not Connected"
+                    self.show_notion_token_input = True
+
+                if "\njira " in output or "^jira " in output or "jira " in output:
+                    self.jira_connection_status = "Connected (Live)"
+                    self.show_jira_token_input = False
+                else:
+                    self.jira_connection_status = "Not Connected"
+                    self.show_jira_token_input = True
+
+                if "\nslack " in output or "^slack " in output or "slack " in output:
+                    self.slack_connection_status = "Connected (Live)"
+                    self.show_slack_token_input = False
+                else:
+                    self.slack_connection_status = "Not Connected"
+                    self.show_slack_token_input = True
+        except Exception:
+            async with self:
+                self.github_connection_status = "Connection Error"
+                self.osv_connection_status = "Connection Error"
+                self.notion_connection_status = "Connection Error"
+                self.jira_connection_status = "Connection Error"
+                self.slack_connection_status = "Connection Error"
+
+    def handle_key_down(self, key: str):
         """
         Handles keyboard entries inside the triage console.
-        If 'Enter' is typed, it delegates to the core investigation generator,
-        yielding updates dynamically back to the client event loop.
+        If 'Enter' is typed, it delegates to the core investigation background task.
         """
         if key == "Enter" and not self.is_investigating:
-            async for _ in self.trigger_investigation():
-                yield
+            return State.trigger_investigation
 
     def _parse_query_impact(self, dataset: List[Dict[str, Any]]):
         """
@@ -372,6 +604,132 @@ def header() -> rx.Component:
     )
 
 
+def integrations_dialog() -> rx.Component:
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.button("🔌 Manage Data Integrations", width="100%", size="2", variant="outline", color_scheme="teal")
+        ),
+        rx.dialog.content(
+            rx.dialog.title("Data Integrations"),
+            rx.dialog.description("Manage connections to external Zero-Warehouse sources."),
+            rx.vstack(
+                # GitHub Integration Card
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("GitHub API", weight="bold"),
+                            rx.badge(State.github_connection_status, color_scheme=rx.cond(State.github_connection_status == "Connected (Live)", "green", "orange")),
+                            justify="between", width="100%"
+                        ),
+                        rx.cond(
+                            State.show_github_token_input,
+                            rx.vstack(
+                                rx.text("1. Authenticate with a Personal Access Token (One-time connection).", size="1", color="gray"),
+                                rx.input(placeholder="GitHub Token (ghp_...)", on_change=State.set_github_token, type="password", width="100%"),
+                                rx.button("Connect API", on_click=State.connect_github, color_scheme="ruby", variant="soft", width="100%"),
+                                width="100%",
+                                spacing="2"
+                            ),
+                            rx.button("Update Token", on_click=State.toggle_github_token_input, color_scheme="gray", variant="outline", size="1", width="100%")
+                        ),
+                        
+                        rx.divider(margin_y="10px"),
+                        rx.text("2. Target Repository Scope:", size="2", font_weight="bold"),
+                        rx.text("All SRE workings will use this default repository unless overridden in the prompt.", size="1", color="gray"),
+                        rx.hstack(
+                            rx.input(placeholder="Username (e.g. TANISHX1)", on_change=State.set_github_owner, width="50%"),
+                            rx.input(placeholder="Repository (e.g. seat-allocation-sys)", on_change=State.set_github_repo_name, width="50%"),
+                            width="100%"
+                        ),
+                        rx.button("Update Scope", on_click=State.update_github_scope, color_scheme="indigo", variant="soft", size="1", width="100%"),
+                        spacing="3",
+                        width="100%"
+                    ),
+                    width="100%"
+                ),
+                # OSV Database Card
+                rx.card(
+                    rx.hstack(
+                        rx.text("OSV Vulnerabilities", weight="bold"),
+                        rx.badge(State.osv_connection_status, color_scheme="green"),
+                        justify="between", width="100%"
+                    ),
+                    width="100%"
+                ),
+                # Notion Card
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Notion Workspace", weight="bold"),
+                            rx.badge(State.notion_connection_status, color_scheme=rx.cond(State.notion_connection_status == "Connected (Live)", "green", "orange")),
+                            justify="between", width="100%"
+                        ),
+                        rx.cond(
+                            State.show_notion_token_input,
+                            rx.vstack(
+                                rx.text("Authenticate with an Internal Integration Token.", size="1", color="gray"),
+                                rx.input(placeholder="Notion Secret (secret_...)", on_change=State.set_notion_token, type="password", width="100%"),
+                                rx.button("Connect API", on_click=State.connect_notion, color_scheme="ruby", variant="soft", width="100%"),
+                                width="100%", spacing="2"
+                            ),
+                            rx.button("Update Token", on_click=State.toggle_notion_token_input, color_scheme="gray", variant="outline", size="1", width="100%")
+                        ),
+                    ),
+                    width="100%"
+                ),
+                # Jira Card
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Atlassian Jira", weight="bold"),
+                            rx.badge(State.jira_connection_status, color_scheme=rx.cond(State.jira_connection_status == "Connected (Live)", "green", "orange")),
+                            justify="between", width="100%"
+                        ),
+                        rx.cond(
+                            State.show_jira_token_input,
+                            rx.vstack(
+                                rx.text("Authenticate with an Atlassian API Token.", size="1", color="gray"),
+                                rx.input(placeholder="Jira Token", on_change=State.set_jira_token, type="password", width="100%"),
+                                rx.button("Connect API", on_click=State.connect_jira, color_scheme="ruby", variant="soft", width="100%"),
+                                width="100%", spacing="2"
+                            ),
+                            rx.button("Update Token", on_click=State.toggle_jira_token_input, color_scheme="gray", variant="outline", size="1", width="100%")
+                        ),
+                    ),
+                    width="100%"
+                ),
+                # Slack Card
+                rx.card(
+                    rx.vstack(
+                        rx.hstack(
+                            rx.text("Slack Enterprise", weight="bold"),
+                            rx.badge(State.slack_connection_status, color_scheme=rx.cond(State.slack_connection_status == "Connected (Live)", "green", "orange")),
+                            justify="between", width="100%"
+                        ),
+                        rx.cond(
+                            State.show_slack_token_input,
+                            rx.vstack(
+                                rx.text("Authenticate with a Slack Bot Token.", size="1", color="gray"),
+                                rx.input(placeholder="Slack Token (xoxb-...)", on_change=State.set_slack_token, type="password", width="100%"),
+                                rx.button("Connect API", on_click=State.connect_slack, color_scheme="ruby", variant="soft", width="100%"),
+                                width="100%", spacing="2"
+                            ),
+                            rx.button("Update Token", on_click=State.toggle_slack_token_input, color_scheme="gray", variant="outline", size="1", width="100%")
+                        ),
+                    ),
+                    width="100%"
+                ),
+                spacing="4",
+                width="100%",
+                margin_top="15px"
+            ),
+            rx.dialog.close(
+                rx.button("Done", margin_top="20px", width="100%", variant="soft")
+            ),
+            max_width="600px"
+        )
+    )
+
 def sidebar_forensics() -> rx.Component:
     """
     Left Sidebar: Drag & Drop zone for Parquet files and incident response playbook shortcuts.
@@ -461,6 +819,11 @@ def sidebar_forensics() -> rx.Component:
             margin_top="10px"
         ),
         
+        rx.divider(border_color="rgba(255,255,255,0.05)", margin_y="15px"),
+
+        # 4. API INTEGRATIONS
+        integrations_dialog(),
+
         width="100%",
         padding="20px",
         height="calc(100vh - 80px)",
@@ -819,4 +1182,4 @@ app = rx.App(
 )
 
 # Bind index page route to compilation target
-app.add_page(index, route="/", title="Aegis-Antigravity SRE | Zero-Warehouse Forensics")
+app.add_page(index, route="/", title="Aegis-Antigravity SRE | Zero-Warehouse Forensics", on_load=State.check_coral_connections)
