@@ -1,5 +1,5 @@
 """
-Aegis-Antigravity: Pure Python Reactive Command Dashboard
+Aegis SRE: Pure Python Reactive Command Dashboard
 -------------------------------------------------------------
 This is the core Reflex UI module. It binds the state management, the SVG visual 
 node threat graph, file upload forensic workflows, and the cognitive brain 
@@ -47,17 +47,17 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agent.sre_brain import SREBrain
 
 # CSS Theme definitions (Premium Glassmorphic Cyberpunk design)
-THEME_BG = "radial-gradient(circle at 50% 50%, #08070b 0%, #111016 100%)"
-ACCENT_CORAL = "#FF6F61"
-ACCENT_CYAN = "#00F2FE"
-ACCENT_PURPLE = "#9D4EDD"
+THEME_BG = "radial-gradient(circle at 50% 10%, rgba(0, 242, 254, 0.05) 0%, transparent 50%), radial-gradient(circle at 80% 60%, rgba(157, 78, 221, 0.03) 0%, transparent 40%), radial-gradient(circle at 20% 80%, rgba(255, 107, 107, 0.03) 0%, transparent 40%), #050508"
+ACCENT_CORAL = "#ff6b6b"
+ACCENT_CYAN = "#00f2fe"
+ACCENT_PURPLE = "#9d4edd"
 
 
 GLASS_BOX = {
-    "background": "rgba(18, 17, 24, 0.65)",
+    "background": "rgba(9, 9, 13, 0.65)",
     "backdrop_filter": "blur(16px)",
     "-webkit-backdrop-filter": "blur(16px)",
-    "border": "1px solid rgba(255, 255, 255, 0.05)",
+    "border": "1px solid rgba(0, 242, 254, 0.08)",
     "border_radius": "14px",
     "box_shadow": "0 8px 32px 0 rgba(0, 0, 0, 0.4)",
 }
@@ -77,7 +77,7 @@ class State(rx.State):
     chat_history: List[Dict[str, str]] = [
         {
             "role": "assistant",
-            "content": "👋 **Aegis-Antigravity Core Online**. I am your Zero-Warehouse Autonomous Agent. Drop `.parquet` files in the sidebar and trigger an investigation. I will join local telemetry logs with vulnerability databases and GitHub records to isolate root causes."
+            "content": "**Aegis SRE Core Online**. I am your Zero-Warehouse Autonomous Agent. Drop `.parquet` files in the sidebar and trigger an investigation. I will join local telemetry logs with vulnerability databases and GitHub records to isolate root causes."
         }
     ]
     
@@ -204,17 +204,17 @@ class State(rx.State):
                 
                 async with self:
                     if step_type == "status":
-                        self.agent_thought_log.append(f"🔄 {step.get('content')}")
+                        self.agent_thought_log.append(f"[STATUS] {step.get('content')}")
                     elif step_type == "thought":
-                        self.agent_thought_log.append(f"🧠 {step.get('content')}")
+                        self.agent_thought_log.append(f"[COGNITION] {step.get('content')}")
                     elif step_type == "tool_call":
                         tool_name = step.get("tool_name")
                         args = step.get("arguments", {})
-                        self.agent_thought_log.append(f"🛠️ Tool Call: {tool_name} with params -> {args}")
+                        self.agent_thought_log.append(f"[TOOL_INVOCATION] {tool_name} with params -> {args}")
                     elif step_type == "tool_result":
                         tool_name = step.get("tool_name")
                         result = step.get("result", {})
-                        self.agent_thought_log.append(f"✅ Tool {tool_name} returned status: {result.get('status')}")
+                        self.agent_thought_log.append(f"[TOOL_RESULT] {tool_name} returned status: {result.get('status')}")
                         
                         # Dynamically update the blast radius or SVG topology based on Coral execution outputs!
                         if tool_name == "execute_coral_query" and result.get("status") == "success":
@@ -223,23 +223,27 @@ class State(rx.State):
                             nodes = result.get("nodes", [])
                             edges = result.get("edges", [])
                             if nodes:
+                                # Normalize status values for frontend color matching
+                                for n in nodes:
+                                    s = n.get("status", "").strip().lower()
+                                    n["status"] = "Healthy" if s in ("healthy", "stable", "ok", "operational", "normal", "running", "active", "up") else "Degraded"
                                 self.blast_radius_nodes = nodes
                                 self.blast_radius_edges = edges
-                                self.agent_thought_log.append("🚨 Agent has dynamically redrawn the Threat Topology graph!")
+                                self.agent_thought_log.append("[ALERT] Agent has dynamically redrawn the Threat Topology graph!")
                     elif step_type == "final":
                         self.chat_history.append({"role": "user", "content": current_q})
                         self.chat_history.append({"role": "assistant", "content": step.get("content", "")})
                         self.current_question = ""
                     elif step_type == "error":
-                        self.agent_thought_log.append(f"❌ Error: {step.get('content')}")
-                        self.chat_history.append({"role": "assistant", "content": f"⚠️ Aegis Brain encountered an execution block: {step.get('content')}"})
+                        self.agent_thought_log.append(f"[ERROR] {step.get('content')}")
+                        self.chat_history.append({"role": "assistant", "content": f"[WARNING] Aegis Brain encountered an execution block: {step.get('content')}"})
                 
                 # Push state delta updates to the Reflex websocket immediately
                 yield
                 
         except Exception as e:
             async with self:
-                self.agent_thought_log.append(f"❌ Fatal crash in Aegis brain loop: {str(e)}")
+                self.agent_thought_log.append(f"[FATAL_CRASH] Aegis brain loop: {str(e)}")
             yield
             
         async with self:
@@ -548,7 +552,7 @@ class State(rx.State):
         if not dataset or not self.demo_mode:
             return
             
-        self.agent_thought_log.append(f"📊 Analyzing {len(dataset)} query records to calculate blast radius topology...")
+        self.agent_thought_log.append(f"[ANALYSIS] Analyzing {len(dataset)} query records to calculate blast radius topology...")
         
         # Simple threat matching logic
         has_vulnerability = False
@@ -577,7 +581,7 @@ class State(rx.State):
                 mutated_nodes.append(mutated)
                 
             self.blast_radius_nodes = mutated_nodes
-            self.agent_thought_log.append("🚨 Threat Topology updated. API Gateway and Auth Service flag vulnerability alert!")
+            self.agent_thought_log.append("[ALERT] Threat Topology updated. API Gateway and Auth Service flag vulnerability alert!")
 
 
 # ==========================================
@@ -596,7 +600,7 @@ def header() -> rx.Component:
                 style={"filter": "drop-shadow(0 0 8px #FF6F61)"}
             ),
             rx.vstack(
-                rx.heading("AEGIS-ANTIGRAVITY", size="5", color="white", font_family="Inter", font_weight="700"),
+                rx.heading("AEGIS SRE", size="5", color="white", font_family="Inter", font_weight="700"),
                 rx.text("Zero-Warehouse Federated Forensics", size="1", color="rgba(255, 255, 255, 0.5)", font_family="Inter"),
                 spacing="0"
             ),
@@ -631,11 +635,15 @@ def header() -> rx.Component:
             align="center",
             spacing="4"
         ),
+        position="fixed",
+        top="0",
+        left="0",
+        right="0",
+        z_index="10",
         width="100%",
-        padding="15px 25px",
-        background_color="rgba(10, 10, 12, 0.8)",
-        border_bottom="1px solid rgba(255, 255, 255, 0.05)",
-        backdrop_filter="blur(10px)",
+        padding="15px 25px 30px 25px",
+        background="linear-gradient(to bottom, #050508 0%, rgba(5, 5, 8, 0.95) 45%, rgba(5, 5, 8, 0.7) 70%, rgba(5, 5, 8, 0) 100%)",
+        backdrop_filter="blur(12px)",
         align="center"
     )
 
@@ -876,8 +884,8 @@ def sidebar_forensics() -> rx.Component:
         integrations_dialog(),
 
         width="100%",
-        padding="20px",
-        height="calc(100vh - 80px)",
+        padding="95px 20px 20px 20px",
+        height="100vh",
         background_color="rgba(14, 13, 18, 0.5)",
         border_right="1px solid rgba(255,255,255,0.05)",
         overflow_y="auto"
@@ -900,10 +908,10 @@ def chat_console() -> rx.Component:
                             rx.hstack(
                                 rx.cond(
                                     msg["role"] == "user",
-                                    rx.text("👤 OPERATOR", font_size="10px", font_weight="700", font_family="JetBrains Mono", color=ACCENT_CYAN),
+                                    rx.text("OPERATOR", font_size="10px", font_weight="700", font_family="JetBrains Mono", color=ACCENT_CYAN),
                                     rx.hstack(
                                         rx.image(src="/aegis_logo.png", width="14px", height="14px"),
-                                        rx.text("AEGIS AGENT", font_size="10px", font_weight="700", font_family="JetBrains Mono", color=ACCENT_CORAL),
+                                        rx.text("AEGIS AGENT", font_size="10px", font_weight="700", font_family="JetBrains Mono", color="#9954de"),
                                         align="center",
                                         spacing="2"
                                     )
@@ -949,12 +957,12 @@ def chat_console() -> rx.Component:
                     style={
                         "width": "6px",
                         "height": "6px",
-                        "background_color": "#FFB703",
+                        "background_color": ACCENT_CYAN,
                         "border_radius": "50%",
                         "animation": rx.cond(State.is_investigating, "pulse 1.5s infinite", "none")
                     }
                 ),
-                rx.text("AGENT COGNITIVE LOG STREAM (REAL-TIME)", font_size="10px", font_weight="700", color="#FFB703", font_family="JetBrains Mono"),
+                rx.text("AGENT COGNITIVE LOG STREAM (REAL-TIME)", font_size="10px", font_weight="700", color=ACCENT_CYAN, font_family="JetBrains Mono"),
                 rx.spacer(),
                 rx.cond(
                     State.is_investigating,
@@ -989,8 +997,8 @@ def chat_console() -> rx.Component:
                 width="100%"
             ),
             width="100%",
-            background_color="#0A0A0C",
-            border="1px solid rgba(255, 183, 3, 0.15)",
+            background_color="#050508",
+            border="1px solid rgba(0, 242, 254, 0.15)",
             border_radius="8px",
             margin_bottom="15px"
         ),
@@ -1015,15 +1023,15 @@ def chat_console() -> rx.Component:
                 disabled=State.is_investigating
             ),
             rx.button(
-                rx.cond(State.is_investigating, rx.spinner(size="1"), "Investigate 🚀"),
+                rx.cond(State.is_investigating, rx.spinner(size="1"), "Investigate"),
                 on_click=State.trigger_investigation(),
-                background_color=ACCENT_CORAL,
+                background_color="#9954de",
                 color="white",
                 font_family="Inter",
                 font_weight="600",
                 border_radius="8px",
                 padding="10px 20px",
-                _hover={"background_color": "#FF8A7F"},
+                _hover={"background_color": "#b073f4"},
                 disabled=State.is_investigating
             ),
             width="100%",
@@ -1033,8 +1041,8 @@ def chat_console() -> rx.Component:
         ),
         
         width="100%",
-        padding="20px",
-        height="calc(100vh - 80px)",
+        padding="95px 20px 20px 20px",
+        height="100vh",
         align="stretch"
     )
 
@@ -1075,14 +1083,14 @@ def threat_intelligence() -> rx.Component:
                             cx=node["x"],
                             cy=node["y"],
                             r=12,
-                            fill=rx.cond(node["status"] == "Stable", "rgba(0, 242, 254, 0.1)", rx.cond(node["status"] == "Source", "rgba(157, 78, 221, 0.15)", "rgba(255, 111, 97, 0.15)")),
-                            stroke=rx.cond(node["status"] == "Stable", ACCENT_CYAN, rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
+                            fill=rx.cond(node["status"] == "Healthy", "rgba(39, 201, 63, 0.15)", rx.cond(node["status"] == "Source", "rgba(157, 78, 221, 0.15)", "rgba(255, 107, 107, 0.15)")),
+                            stroke=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
                             stroke_width="2",
                             style={
                                 "filter": rx.cond(
-                                    node["status"] == "Stable",
-                                    "drop-shadow(0 0 5px #00F2FE)",
-                                    rx.cond(node["status"] == "Source", "none", "drop-shadow(0 0 5px #FF6F61)")
+                                    node["status"] == "Healthy",
+                                    "drop-shadow(0 0 5px #27c93f)",
+                                    rx.cond(node["status"] == "Source", "none", "drop-shadow(0 0 5px #ff6b6b)")
                                 )
                             }
                         ),
@@ -1095,7 +1103,7 @@ def threat_intelligence() -> rx.Component:
                         ),
                         # Text Labels
                         rx.el.text(
-                            node["name"],
+                            node["label"],
                             x=node["x"],
                             y=node["y"],
                             dy="-18",
@@ -1112,7 +1120,7 @@ def threat_intelligence() -> rx.Component:
                             y=node["y"],
                             dy="22",
                             text_anchor="middle",
-                            fill=rx.cond(node["status"] == "Stable", ACCENT_CYAN, rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
+                            fill=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
                             font_size="7px",
                             font_family="JetBrains Mono",
                             font_weight="700"
@@ -1155,7 +1163,7 @@ def threat_intelligence() -> rx.Component:
                         rx.text("Health status:", font_size="11px", color="rgba(255,255,255,0.4)", font_family="Inter", width="90px"),
                         rx.badge(
                             State.selected_node_info["status"],
-                            color_scheme=rx.cond(State.selected_node_info["status"] == "Stable", "teal", rx.cond(State.selected_node_info["status"] == "Source", "purple", "red")),
+                            color_scheme=rx.cond(State.selected_node_info["status"] == "Healthy", "green", rx.cond(State.selected_node_info["status"] == "Source", "purple", "red")),
                             variant="soft"
                         ),
                         align="center"
@@ -1186,8 +1194,8 @@ def threat_intelligence() -> rx.Component:
         ),
         
         width="100%",
-        padding="20px",
-        height="calc(100vh - 80px)",
+        padding="95px 20px 20px 20px",
+        height="100vh",
         background_color="rgba(14, 13, 18, 0.5)",
         border_left="1px solid rgba(255,255,255,0.05)",
         overflow_y="auto"
@@ -1213,7 +1221,7 @@ def landing_data_stream() -> rx.Component:
         "osv.scan_dependencies(lockfile='poetry.lock')\n"
         "forensics.upload_parquet(sandbox='/logs')\n"
         "graph.render_svg(viewbox=state.svg_view_box)\n"
-        "state.agent_thought_log.append('✨ Scan complete')\n"
+        "state.agent_thought_log.append('[SYSTEM] Scan complete')\n"
         "telemetry.stream(protocol='websocket', fps=60)\n"
     )
     return rx.el.div(
@@ -1243,7 +1251,7 @@ def landing_data_stream() -> rx.Component:
         "osv.scan_dependencies(lockfile='poetry.lock')\n"
         "forensics.upload_parquet(sandbox='/logs')\n"
         "graph.render_svg(viewbox=state.svg_view_box)\n"
-        "state.agent_thought_log.append('✨ Scan complete')\n"
+        "state.agent_thought_log.append('[SYSTEM] Scan complete')\n"
         "telemetry.stream(protocol='websocket', fps=60)\n"
     )
     return rx.el.div(
@@ -1273,7 +1281,7 @@ def parquet_visual_mock() -> rx.Component:
             ),
             rx.vstack(
                 rx.hstack(
-                    rx.text("aegis-antigravity ~ %", color="#00f2fe", font_family="JetBrains Mono", font_size="11px"),
+                    rx.text("aegis-sre ~ %", color="#00f2fe", font_family="JetBrains Mono", font_size="11px"),
                     rx.text("parquet-inspect telemetry_dump.parquet", color="white", font_family="JetBrains Mono", font_size="11px"),
                     align="center"
                 ),
@@ -1311,7 +1319,7 @@ def thought_log_visual_mock() -> rx.Component:
                 margin_bottom="10px"
             ),
             rx.vstack(
-                rx.text("● [01:42:09] Initializing Aegis-Antigravity Core context...", font_family="JetBrains Mono", font_size="11px", color="rgba(255,255,255,0.5)"),
+                rx.text("● [01:42:09] Initializing Aegis SRE Core context...", font_family="JetBrains Mono", font_size="11px", color="rgba(255,255,255,0.5)"),
                 rx.text("● [01:42:10] Ingesting sandboxed Parquet forensics schema...", font_family="JetBrains Mono", font_size="11px", color="rgba(255,255,255,0.7)"),
                 rx.text("● [01:42:11] OSV database connection isolated. Scanning lockfiles...", font_family="JetBrains Mono", font_size="11px", color="#ff6b6b"),
                 rx.text("● [01:42:12] CVE vulnerability isolated: urllib3 (CVE-2023-43804)", font_family="JetBrains Mono", font_size="11px", color="#ff6b6b", font_weight="700"),
@@ -1360,7 +1368,7 @@ def topology_visual_mock() -> rx.Component:
                     rx.el.circle(cx="220", cy="180", r="12", fill="none", stroke="#ff6b6b", stroke_width="2", class_name="mock-node-pulse"),
                     
                     # Nodes circles
-                    rx.el.circle(cx="70", cy="120", r="8", fill="#00f2fe"),
+                    rx.el.circle(cx="70", cy="120", r="8", fill="#27c93f"),
                     rx.el.circle(cx="220", cy="60", r="8", fill="#27c93f"),
                     rx.el.circle(cx="220", cy="180", r="8", fill="#ff6b6b"),
                     rx.el.circle(cx="370", cy="120", r="8", fill="#9d4edd"),
@@ -1410,7 +1418,7 @@ def integration_visual_mock() -> rx.Component:
                 rx.hstack(
                     rx.text("🟢 GitHub Commit-Log", font_family="JetBrains Mono", font_size="11px", color="rgba(255,255,255,0.75)", width="160px"),
                     rx.spacer(),
-                    rx.text("CONNECTED // aegis-antigravity", font_family="JetBrains Mono", font_size="11px", color="#00f2fe")
+                    rx.text("CONNECTED // aegis-sre", font_family="JetBrains Mono", font_size="11px", color="#00f2fe")
                 ),
                 rx.el.div(class_name="data-bar", style={"width": "100%", "opacity": "0.1"}),
                 rx.hstack(
@@ -1452,14 +1460,14 @@ def landing_page() -> rx.Component:
         rx.hstack(
             rx.hstack(
                 rx.image(src="/aegis_logo.png", width="24px", height="24px"),
-                rx.text("AEGIS // ANTIGRAVITY", font_family="JetBrains Mono", font_weight="700", font_size="14px", letter_spacing="0.15em", color="white"),
+                rx.text("AEGIS // SRE", font_family="JetBrains Mono", font_weight="700", font_size="14px", letter_spacing="0.15em", color="white"),
                 align="center",
                 spacing="2"
             ),
             rx.spacer(),
             rx.hstack(
                 rx.text("FIELD-STATION-01 //", font_size="10px", font_family="JetBrains Mono", color="rgba(255,255,255,0.3)"),
-                rx.text("ONLINE", font_size="10px", font_family="JetBrains Mono", color="#00f2fe", font_weight="700"),
+                rx.text("ONLINE", font_size="10px", font_family="JetBrains Mono", color="#27c93f", font_weight="700"),
                 rx.el.span(class_name="status-blink"),
                 align="center",
                 spacing="2"
@@ -1508,7 +1516,7 @@ def landing_page() -> rx.Component:
 
             # Subtitle
             rx.text(
-                "ANTIGRAVITY ENGINE",
+                "SRE ENGINE",
                 font_family="JetBrains Mono",
                 font_size="15px",
                 font_weight="300",
@@ -1539,7 +1547,7 @@ def landing_page() -> rx.Component:
                 rx.vstack(
                     rx.hstack(
                         rx.text("PLATFORM", font_size="9px", color="rgba(255,255,255,0.3)", font_family="JetBrains Mono", letter_spacing="0.1em", width="90px"),
-                        rx.text("ACTIVE / FORWARD DEPLOYED", font_size="9px", color="#00f2fe", font_family="JetBrains Mono", font_weight="700"),
+                        rx.text("ACTIVE / FORWARD DEPLOYED", font_size="9px", color="#27c93f", font_family="JetBrains Mono", font_weight="700"),
                         align="center"
                     ),
                     rx.hstack(
@@ -1562,8 +1570,16 @@ def landing_page() -> rx.Component:
 
             # Scroll indicator pointing down
             rx.el.div(
-                rx.text("SCROLL TO AUDIT SYSTEM FEATURES", font_size="8px", font_family="JetBrains Mono", color="rgba(255,255,255,0.3)", letter_spacing="0.2em"),
-                class_name="scroll-indicator fade-up fade-up-d4"
+                rx.el.div(
+                    rx.text("SCROLL TO AUDIT SYSTEM FEATURES", font_size="8px", font_family="JetBrains Mono", color="rgba(255,255,255,0.3)", letter_spacing="0.2em"),
+                    class_name="scroll-indicator"
+                ),
+                class_name="fade-up fade-up-d4",
+                width="100%",
+                position="absolute",
+                bottom="0",
+                left="0",
+                right="0"
             ),
 
             align="center",
@@ -1714,7 +1730,7 @@ def dashboard() -> rx.Component:
                 threat_intelligence(),
                 grid_template_columns="280px 1fr 340px",
                 width="100%",
-                height="calc(100vh - 80px)",
+                height="100vh",
                 spacing="0"
             ),
             spacing="0",
@@ -1746,7 +1762,7 @@ def index() -> rx.Component:
         ),
         width="100%",
         height="100vh",
-        background="#04030a"
+        background="#050508"
     )
 
 
@@ -1754,7 +1770,7 @@ def index() -> rx.Component:
 app = rx.App(
     style={
         "font_family": "Inter",
-        "background_color": "#08070b",
+        "background_color": "#050508",
     },
     stylesheets=[
         "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap",
@@ -1763,4 +1779,4 @@ app = rx.App(
 )
 
 # Bind index page route to compilation target
-app.add_page(index, route="/", title="Aegis-Antigravity | Zero-Warehouse Forensics", on_load=State.check_coral_connections)
+app.add_page(index, route="/", title="Aegis SRE | Zero-Warehouse Forensics", on_load=State.check_coral_connections)

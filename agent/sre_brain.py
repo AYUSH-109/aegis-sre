@@ -73,12 +73,26 @@ class ThreatEdge(BaseModel):
     source: str = Field(description="Source node ID")
     target: str = Field(description="Target node ID")
 
+def _normalize_node_status(status: str) -> str:
+    """Normalize agent-generated status strings to the two canonical values
+    the frontend SVG renderer expects: 'Healthy' or 'Degraded'.
+    The Gemini model often returns variations like 'HEALTHY', 'Ok', 'WARNING', 
+    'CRITICAL', etc. which break the exact-match rx.cond() checks."""
+    s = status.strip().lower()
+    if s in ("healthy", "stable", "ok", "operational", "normal", "running", "active", "up"):
+        return "Healthy"
+    return "Degraded"
+
+
 def update_threat_topology(nodes: list[ThreatNode], edges: list[ThreatEdge]) -> dict:
     """
     Updates the visual Threat Topology graph on the dashboard with new microservice components.
     """
     nodes_dict = [n.model_dump() if hasattr(n, "model_dump") else n for n in nodes]
     edges_dict = [e.model_dump() if hasattr(e, "model_dump") else e for e in edges]
+    # Normalize status values so the frontend color conditionals always match
+    for node in nodes_dict:
+        node["status"] = _normalize_node_status(node.get("status", "Healthy"))
     return {"status": "success", "nodes": nodes_dict, "edges": edges_dict}
 
 # Initialize dotenv to load local secrets. override=True ensures .env values
@@ -91,7 +105,7 @@ logger = logging.getLogger("SREBrain")
 # Configure the System Prompt containing the federated architecture instructions.
 # Why? Explicit schema definitions and join patterns are supplied inside the system prompt 
 # to optimize zero-shot SQL generation accuracy and instruct the model on TANISHX1's git author context.
-SYSTEM_PROMPT = """You are "Aegis-Antigravity", an elite Zero-Warehouse root-cause investigation agent and Principal Systems Architect. 
+SYSTEM_PROMPT = """You are "Aegis SRE", an elite Zero-Warehouse root-cause investigation agent and Principal Systems Architect. 
 Your goal is to investigate production incidents, find root causes, and trigger automated remediations.
 
 You are equipped with three tools:
@@ -633,7 +647,7 @@ class SREBrain:
         # 4. Stream final report
         yield {
             "type": "final",
-            "content": """### Root Cause Analysis & Forensic Summary: Aegis-Antigravity
+            "content": """### Root Cause Analysis & Forensic Summary: Aegis SRE
 *   **Root Cause**: The production crash was triggered by a high-severity cookie-leak vulnerability in **urllib3** (`CVE-2023-43804`). This vulnerability was committed by developer **TANISHX1** in commit `a5d89f3` while refactoring dependencies.
 *   **Blast Radius**: The issue has degraded **api-gateway** and **auth-service**, generating `500 Server Error` response codes across 12% of traffic.
 *   **Triggered Actions**:
