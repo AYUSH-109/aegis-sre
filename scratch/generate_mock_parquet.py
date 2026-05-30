@@ -81,7 +81,7 @@ def generate_telemetry():
     # Generate GitHub commits mock data
     github_data = {
         "commit_hash": ["a5d89f3", "b72c91a", "c83d10b"],
-        "author": ["TANISHX1", "alice", "bob"],
+        "author": ["charlie", "alice", "bob"],
         "commit_date": [
             "2026-05-25 15:20:00",
             "2026-05-24 10:10:00",
