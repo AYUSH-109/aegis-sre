@@ -2,7 +2,6 @@ name: osv
 version: 0.1.0
 dsl_version: 3
 backend: parquet
-
 tables:
   - name: packages
     description: "Google OSV API mock"
