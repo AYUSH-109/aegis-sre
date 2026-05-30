@@ -25,11 +25,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire project
 COPY . .
 
-# Register Coral Sources inside the container
-RUN python setup_sources.py
-
 # Expose the frontend and backend ports
 EXPOSE 3000 8000
 
-# Run Reflex in production mode
-CMD ["reflex", "run", "--env", "prod"]
+# Run setup and Reflex at runtime
+CMD ["./entrypoint.sh"]
