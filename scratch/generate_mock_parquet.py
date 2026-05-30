@@ -31,11 +31,11 @@ def generate_telemetry():
         "message": [
             "Invalid JWT signature.", "Rate limit exceeded for IP.",
             "Malformed authentication token.", "Multiple failed login attempts.",
-            "Database connection timeout during credential validation."
+            "Database connection timeout. Fatal error in cryptography package during AES decryption."
         ],
         "ip": ["192.168.1.10", "192.168.1.11", "192.168.1.10", "192.168.1.10", "10.0.5.5"],
         "request_path": ["/v1/auth/verify"] * 5,
-        "response_code": [401, 429, 400, 403, 503]
+        "response_code": [401, 429, 400, 403, 500]
     }
 
     # 3. Payment Gateway Telemetry (Timeouts & API Failures)
@@ -46,11 +46,11 @@ def generate_telemetry():
         "message": [
             "Processing payload.", "Upstream Stripe API slow response.",
             "Timeout waiting for Stripe.", "Payment processing failed.",
-            "Circuit breaker OPEN for stripe_api."
+            "Circuit breaker OPEN for stripe_api. Uncaught Template syntax error in django rendering engine."
         ],
         "ip": ["172.16.0.5"] * 5,
         "request_path": ["/v1/checkout/process"] * 5,
-        "response_code": [200, 200, 504, 500, 503]
+        "response_code": [200, 200, 504, 500, 500]
     }
 
     def save_parquet(data_dict, filename):
