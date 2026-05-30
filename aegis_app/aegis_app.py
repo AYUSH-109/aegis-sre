@@ -130,12 +130,12 @@ class State(rx.State):
 
     # Details of node clicked in the Threat panel
     selected_node_info: Dict[str, str] = {
-        "id": "api-gateway",
-        "name": "API Gateway",
-        "status": "Degraded",
-        "ip": "192.168.1.42",
-        "vulnerable": "urllib3 (CVE-2023-43804)",
-        "remediation": "Upgrade to urllib3>=1.26.18, rollback TANISHX1's commit a5d89f3."
+        "id": "",
+        "name": "N/A",
+        "status": "N/A",
+        "ip": "N/A",
+        "vulnerable": "N/A",
+        "remediation": "N/A"
     }
     
     # 6. Integrations State
@@ -263,11 +263,22 @@ class State(rx.State):
                 elif "cryptography" in n["vulnerable"]:
                     remediation = "Patch package cryptography to version 38.0.2 via Poetry."
                 
+                ip_map = {
+                    "api-gateway": "192.168.1.42",
+                    "auth-service": "192.168.1.105",
+                    "db-primary": "192.168.1.220",
+                    "payment-sys": "192.168.1.118",
+                    "worker-queue": "192.168.1.199",
+                    "primary-db": "192.168.1.220",
+                    "celery-workers": "192.168.1.199"
+                }
+                ip_addr = ip_map.get(n["id"], "192.168.1.50")
+                
                 self.selected_node_info = {
                     "id": n["id"],
                     "name": n["label"],
                     "status": n["status"],
-                    "ip": "N/A",
+                    "ip": ip_addr,
                     "vulnerable": n["vulnerable"],
                     "remediation": remediation
                 }
@@ -774,6 +785,158 @@ def integrations_dialog() -> rx.Component:
         )
     )
 
+def how_to_use_dialog() -> rx.Component:
+    """
+    Interactive floating guide modal helping new operators understand how to use Aegis SRE.
+    """
+    return rx.dialog.root(
+        rx.dialog.trigger(
+            rx.button(
+                "❓ How to Use Guide",
+                position="fixed",
+                bottom="20px",
+                right="20px",
+                z_index="1000",
+                background_color="rgba(153, 84, 222, 0.2)",
+                border="1px solid #9954de",
+                color="white",
+                font_family="JetBrains Mono",
+                font_size="11px",
+                padding="10px 16px",
+                border_radius="30px",
+                backdrop_filter="blur(8px)",
+                _hover={
+                    "background_color": "rgba(153, 84, 222, 0.4)",
+                    "box_shadow": "0 0 15px rgba(153, 84, 222, 0.4)",
+                    "cursor": "pointer"
+                }
+            )
+        ),
+        rx.dialog.content(
+            rx.dialog.title(
+                rx.hstack(
+                    rx.image(src="/aegis_logo.png", width="24px", height="24px"),
+                    rx.text("AEGIS SRE OPERATOR PLAYBOOK", font_family="JetBrains Mono", letter_spacing="0.1em"),
+                    align="center",
+                    spacing="2"
+                )
+            ),
+            rx.dialog.description(
+                "Follow this exact step-by-step operational sequence to run Zero-Warehouse forensics and patch microservices successfully."
+            ),
+            rx.vstack(
+                rx.divider(margin_y="10px", border_color="rgba(255,255,255,0.08)"),
+                
+                # Step 1
+                rx.hstack(
+                    rx.badge("01", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Mount Log Source (Required)", font_weight="bold", size="2"),
+                        rx.text("Vulnerability scans require active system data. Drag and drop your '.parquet' log database into the FORENSIC CONTROL dropzone in the left panel.", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                # Step 2
+                rx.hstack(
+                    rx.badge("02", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Select SRE Playbook", font_weight="bold", size="2"),
+                        rx.text("Click any diagnostic script in the left panel (e.g., 'Zero-Warehouse RCA') to let the agent compile multi-hop joins across OSV logs and GitHub commits.", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                # Step 3
+                rx.hstack(
+                    rx.badge("03", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Conversational Triage", font_weight="bold", size="2"),
+                        rx.text("Use the natural language Chat Console in the middle column to ask questions. Read the 'Agent Cognitive Log Stream' (terminal panel) to audit its live query reasoning.", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                # Step 4
+                rx.hstack(
+                    rx.badge("04", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Analyze Blast Radius Topology", font_weight="bold", size="2"),
+                        rx.text("Observe the right-side dependency graph. SRE color-codes nodes instantly: Green (Healthy), Red (Degraded), or Purple (Source of the incident).", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                # Step 5
+                rx.hstack(
+                    rx.badge("05", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Audit Service Node Details", font_weight="bold", size="2"),
+                        rx.text("Tap any node in the SVG topology map to view active CVE vulnerabilities, system state parameters, and the recommended patch playbook in the Inspector Details sidebar.", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                # Step 6
+                rx.hstack(
+                    rx.badge("06", color_scheme="purple", font_family="JetBrains Mono"),
+                    rx.vstack(
+                        rx.text("Dispatch Automated Hot-Patch", font_weight="bold", size="2"),
+                        rx.text("Click the deep-purple 'Investigate' button inside the Chat Console to dispatch hot-patch workflows (e.g. n8n workflow triggers) to automatically isolate and resolve the issue.", size="1", color="rgba(255,255,255,0.6)"),
+                        align="start",
+                        spacing="0"
+                    ),
+                    spacing="3",
+                    align="start",
+                    width="100%"
+                ),
+                
+                rx.divider(margin_y="10px", border_color="rgba(255,255,255,0.08)"),
+                
+                rx.dialog.close(
+                    rx.button(
+                        "Understood, Start Operations", 
+                        width="100%", 
+                        color_scheme="purple",
+                        font_family="Inter",
+                        font_weight="600"
+                    )
+                ),
+                spacing="4",
+                align="stretch",
+                width="100%"
+            ),
+            style={
+                "background_color": "#09090d",
+                "border": "1px solid rgba(153, 84, 222, 0.2)",
+                "color": "white",
+                "max_width": "500px",
+                "font_family": "Inter"
+            }
+        )
+    )
+
+
 def sidebar_forensics() -> rx.Component:
     """
     Left Sidebar: Drag & Drop zone for Parquet files and incident response playbook shortcuts.
@@ -851,7 +1014,10 @@ def sidebar_forensics() -> rx.Component:
                     color_scheme="teal",
                     size="1",
                     font_family="Inter",
-                    justify="start"
+                    justify="start",
+                    opacity=rx.cond(State.uploaded_logs.length() > 0, "1.0", "0.4"),
+                    cursor=rx.cond(State.uploaded_logs.length() > 0, "pointer", "not-allowed"),
+                    disabled=rx.cond(State.uploaded_logs.length() > 0, False, True)
                 ),
                 rx.button(
                     "🐙 Commit Anomaly Check",
@@ -871,7 +1037,14 @@ def sidebar_forensics() -> rx.Component:
                     color_scheme="orange",
                     size="1",
                     font_family="Inter",
-                    justify="start"
+                    justify="start",
+                    opacity=rx.cond(State.uploaded_logs.length() > 0, "1.0", "0.4"),
+                    cursor=rx.cond(State.uploaded_logs.length() > 0, "pointer", "not-allowed"),
+                    disabled=rx.cond(State.uploaded_logs.length() > 0, False, True)
+                ),
+                rx.cond(
+                    State.uploaded_logs.length() == 0,
+                    rx.text("⚠️ Ingestion required for active playbook scripts.", size="1", color="#ffbd2e", font_style="italic", margin_top="5px")
                 ),
                 width="100%",
                 spacing="3",
@@ -1039,7 +1212,6 @@ def chat_console() -> rx.Component:
             padding_top="10px",
             border_top="1px solid rgba(255,255,255,0.05)"
         ),
-        
         width="100%",
         padding="95px 20px 20px 20px",
         height="100vh",
@@ -1052,6 +1224,68 @@ def threat_intelligence() -> rx.Component:
     Right Panel: Blast Radius dynamic SVG Graph and detailed node inspection.
     """
     return rx.vstack(
+        # Client-side 120Hz High-Fidelity SVG zoom & pan controller script
+        rx.script("""
+            function initSVGZoomPan() {
+                const svg = document.querySelector('.zoom-svg-container');
+                if (!svg || svg.dataset.zoomBound) return;
+                svg.dataset.zoomBound = 'true';
+
+                const g = svg.querySelector('.zoom-g-container');
+                if (!g) return;
+
+                let scale = 1;
+                let translateX = 0;
+                let translateY = 0;
+                let isDragging = false;
+                let startX = 0;
+                let startY = 0;
+
+                g.style.transformOrigin = '150px 150px';
+                g.style.transition = 'transform 0.05s ease-out';
+
+                svg.addEventListener('wheel', e => {
+                    e.preventDefault();
+                    const zoomIntensity = 0.04;
+                    const delta = e.deltaY < 0 ? 1 : -1;
+                    const nextScale = scale + delta * zoomIntensity;
+                    
+                    if (nextScale >= 0.6 && nextScale <= 3.5) {
+                        scale = nextScale;
+                        g.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+                    }
+                }, { passive: false });
+
+                svg.addEventListener('mousedown', e => {
+                    // Only start drag if clicking background, not interactive node
+                    if (e.target.closest('g') && e.target.closest('g').style.cursor === 'pointer') return;
+                    isDragging = true;
+                    startX = e.clientX - translateX;
+                    startY = e.clientY - translateY;
+                    svg.style.cursor = 'grabbing';
+                });
+
+                window.addEventListener('mousemove', e => {
+                    if (!isDragging) return;
+                    translateX = e.clientX - startX;
+                    translateY = e.clientY - startY;
+                    g.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
+                });
+
+                window.addEventListener('mouseup', () => {
+                    if (isDragging) {
+                        isDragging = false;
+                        svg.style.cursor = 'grab';
+                    }
+                });
+
+                svg.style.cursor = 'grab';
+                svg.style.userSelect = 'none';
+            }
+
+            document.addEventListener('DOMContentLoaded', initSVGZoomPan);
+            setInterval(initSVGZoomPan, 500);
+        """),
         rx.heading("BLAST RADIUS TOPOLOGY", size="3", color="white", font_family="Inter", font_weight="600"),
         rx.text("Real-time telemetry dependencies and isolated network compromised paths.", size="1", color="rgba(255,255,255,0.4)", margin_bottom="15px"),
 
@@ -1060,76 +1294,80 @@ def threat_intelligence() -> rx.Component:
         # Renders interactive glowing vectors at 60fps.
         rx.box(
             rx.el.svg(
-                # A. DRAW EDGES / NETWORKING CHANNELS
-                rx.foreach(
-                    State.computed_edges,
-                    lambda edge: rx.el.line(
-                        x1=edge["x1"],
-                        y1=edge["y1"],
-                        x2=edge["x2"],
-                        y2=edge["y2"],
-                        stroke="rgba(255, 255, 255, 0.15)",
-                        stroke_width="1.5",
-                        stroke_dasharray="4,4"
-                    )
+                rx.el.g(
+                    # A. DRAW EDGES / NETWORKING CHANNELS
+                    rx.foreach(
+                        State.computed_edges,
+                        lambda edge: rx.el.line(
+                            x1=edge["x1"],
+                            y1=edge["y1"],
+                            x2=edge["x2"],
+                            y2=edge["y2"],
+                            stroke="rgba(255, 255, 255, 0.15)",
+                            stroke_width="1.5",
+                            stroke_dasharray="4,4"
+                        )
+                    ),
+                    
+                    # B. DRAW NODE GLOWS & LABELS
+                    rx.foreach(
+                        State.blast_radius_nodes,
+                        lambda node: rx.el.g(
+                            # Outer neon glow circle with direct CSS filter drop-shadow
+                            rx.el.circle(
+                                cx=node["x"],
+                                cy=node["y"],
+                                r=12,
+                                fill=rx.cond(node["status"] == "Healthy", "rgba(39, 201, 63, 0.15)", rx.cond(node["status"] == "Source", "rgba(157, 78, 221, 0.15)", "rgba(255, 107, 107, 0.15)")),
+                                stroke=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
+                                stroke_width="2",
+                                style={
+                                    "filter": rx.cond(
+                                        node["status"] == "Healthy",
+                                        "drop-shadow(0 0 5px #27c93f)",
+                                        rx.cond(node["status"] == "Source", "none", "drop-shadow(0 0 5px #ff6b6b)")
+                                    )
+                                }
+                            ),
+                            # Inner core circle
+                            rx.el.circle(
+                                cx=node["x"],
+                                cy=node["y"],
+                                r=5,
+                                fill="white"
+                            ),
+                            # Text Labels
+                            rx.el.text(
+                                node["label"],
+                                x=node["x"],
+                                y=node["y"],
+                                dy="-18",
+                                text_anchor="middle",
+                                fill="rgba(255,255,255,0.8)",
+                                font_size="9px",
+                                font_family="JetBrains Mono",
+                                font_weight="600"
+                            ),
+                            # Status pill subtext
+                            rx.el.text(
+                                node["status"],
+                                x=node["x"],
+                                y=node["y"],
+                                dy="22",
+                                text_anchor="middle",
+                                fill=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
+                                font_size="7px",
+                                font_family="JetBrains Mono",
+                                font_weight="700"
+                            ),
+                            # Clicking a node updates the focus details panels in real-time
+                            on_click=lambda: State.select_node(node["id"]),
+                            style={"cursor": "pointer"}
+                        )
+                    ),
+                    class_name="zoom-g-container"
                 ),
-                
-                # B. DRAW NODE GLOWS & LABELS
-                rx.foreach(
-                    State.blast_radius_nodes,
-                    lambda node: rx.el.g(
-                        # Outer neon glow circle with direct CSS filter drop-shadow
-                        rx.el.circle(
-                            cx=node["x"],
-                            cy=node["y"],
-                            r=12,
-                            fill=rx.cond(node["status"] == "Healthy", "rgba(39, 201, 63, 0.15)", rx.cond(node["status"] == "Source", "rgba(157, 78, 221, 0.15)", "rgba(255, 107, 107, 0.15)")),
-                            stroke=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
-                            stroke_width="2",
-                            style={
-                                "filter": rx.cond(
-                                    node["status"] == "Healthy",
-                                    "drop-shadow(0 0 5px #27c93f)",
-                                    rx.cond(node["status"] == "Source", "none", "drop-shadow(0 0 5px #ff6b6b)")
-                                )
-                            }
-                        ),
-                        # Inner core circle
-                        rx.el.circle(
-                            cx=node["x"],
-                            cy=node["y"],
-                            r=5,
-                            fill="white"
-                        ),
-                        # Text Labels
-                        rx.el.text(
-                            node["label"],
-                            x=node["x"],
-                            y=node["y"],
-                            dy="-18",
-                            text_anchor="middle",
-                            fill="rgba(255,255,255,0.8)",
-                            font_size="9px",
-                            font_family="JetBrains Mono",
-                            font_weight="600"
-                        ),
-                        # Status pill subtext
-                        rx.el.text(
-                            node["status"],
-                            x=node["x"],
-                            y=node["y"],
-                            dy="22",
-                            text_anchor="middle",
-                            fill=rx.cond(node["status"] == "Healthy", "#27c93f", rx.cond(node["status"] == "Source", ACCENT_PURPLE, ACCENT_CORAL)),
-                            font_size="7px",
-                            font_family="JetBrains Mono",
-                            font_weight="700"
-                        ),
-                        # Clicking a node updates the focus details panels in real-time
-                        on_click=lambda: State.select_node(node["id"]),
-                        style={"cursor": "pointer"}
-                    )
-                ),
+                class_name="zoom-svg-container",
                 width="100%",
                 height="100%",
                 view_box="0 0 300 300"
@@ -1436,6 +1674,83 @@ def integration_visual_mock() -> rx.Component:
     )
 
 
+def n8n_visual_mock() -> rx.Component:
+    """Mock visual panel for n8n Automated Workflow Trigger."""
+    return rx.box(
+        rx.vstack(
+            rx.hstack(
+                rx.text("⚡ n8n Workflow Dispatcher", font_family="JetBrains Mono", font_size="11px", color="white"),
+                rx.spacer(),
+                rx.badge("RUNNING", color_scheme="green"),
+                width="100%",
+                margin_bottom="15px"
+            ),
+            rx.vstack(
+                # Node 1: Webhook Trigger
+                rx.hstack(
+                    rx.box(
+                        style={
+                            "width": "8px",
+                            "height": "8px",
+                            "background_color": "#27c93f",
+                            "border_radius": "50%",
+                            "box_shadow": "0 0 6px #27c93f"
+                        }
+                    ),
+                    rx.text("[1] Webhook Trigger", font_family="JetBrains Mono", font_weight="700", font_size="11px", color="white"),
+                    rx.spacer(),
+                    rx.text("HTTP POST 200 OK", font_family="JetBrains Mono", font_size="10px", color="rgba(255,255,255,0.4)")
+                ),
+                # Connecting spine
+                rx.hstack(
+                    rx.box(width="2px", height="15px", background="rgba(255,255,255,0.1)", margin_left="3px"),
+                    width="100%"
+                ),
+                # Node 2: SRE Threat Vector Analyzer
+                rx.hstack(
+                    rx.box(
+                        style={
+                            "width": "8px",
+                            "height": "8px",
+                            "background_color": "#9d4edd",
+                            "border_radius": "50%",
+                            "box_shadow": "0 0 6px #9d4edd"
+                        }
+                    ),
+                    rx.text("[2] Aegis Brain Parser", font_family="JetBrains Mono", font_weight="700", font_size="11px", color="white"),
+                    rx.spacer(),
+                    rx.text("Isolated CVE-2023", font_family="JetBrains Mono", font_size="10px", color="rgba(255,255,255,0.4)")
+                ),
+                # Connecting spine
+                rx.hstack(
+                    rx.box(width="2px", height="15px", background="rgba(255,255,255,0.1)", margin_left="3px"),
+                    width="100%"
+                ),
+                # Node 3: Automated Actions Dispatch
+                rx.hstack(
+                    rx.box(
+                        style={
+                            "width": "8px",
+                            "height": "8px",
+                            "background_color": "#ff6b6b",
+                            "border_radius": "50%",
+                            "box_shadow": "0 0 6px #ff6b6b"
+                        }
+                    ),
+                    rx.text("[3] Production Hot-Patch", font_family="JetBrains Mono", font_weight="700", font_size="11px", color="white"),
+                    rx.spacer(),
+                    rx.badge("DISPATCHED", color_scheme="red")
+                ),
+                width="100%",
+                spacing="1",
+                align="stretch"
+            ),
+            width="100%"
+        ),
+        class_name="fui-visual-panel"
+    )
+
+
 def showcase_feature_text(heading: str, label: str, title: str, description: str, color_accent: str) -> rx.Component:
     """GitHub-style bold left aligned feature descriptions."""
     return rx.vstack(
@@ -1664,6 +1979,23 @@ def landing_page() -> rx.Component:
                 style={"position": "relative"},
             ),
 
+            # SECTION 2E: FEATURE 5 (n8n Workflow Remediation)
+            rx.el.div(
+                rx.el.div(class_name="spine-node", style={"top": "100px"}),
+                rx.el.div(
+                    showcase_feature_text(
+                        "AUTOMATED REMEDIATION",
+                        "N8N WORKFLOWS",
+                        "Instant Multi-Service Outage Resolution & Patching",
+                        "Trigger fast n8n workflow pipelines on isolated SRE telemetry detections. Securely lock down failing gateways, rollback broken builds on GitHub, log forensic playbooks in Notion, and notify teams on Slack—remediating incident threats in seconds.",
+                        "#27c93f"
+                    ),
+                    rx.box(n8n_visual_mock(), class_name="showcase-visual-col"),
+                    class_name="showcase-row"
+                ),
+                style={"position": "relative"},
+            ),
+
             class_name="github-spine-container"
         ),
 
@@ -1738,6 +2070,7 @@ def dashboard() -> rx.Component:
             height="100vh",
             overflow="hidden"
         ),
+        how_to_use_dialog(),
         background=THEME_BG,
         width="100%",
         height="100vh",
